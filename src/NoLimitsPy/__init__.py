@@ -17,7 +17,8 @@ const DataFrames = NoLimits.DataFrames
 nl_df(tbl) = DataFrames.DataFrame(tbl)
 nl_pydf(x) = DataFrames.DataFrame(PythonCall.PyTable(x))
 nl_names(x) = string.(Base.names(nl_df(x)))
-nl_table(x) = (df = nl_df(x); (; (Symbol(n) => df[!, n] for n in Base.names(df))...))
+nl_col(v) = eltype(v) <: Union{Real, AbstractString, Missing, Nothing} ? v : string.(v)
+nl_table(x) = (df = nl_df(x); (; (Symbol(n) => nl_col(df[!, n]) for n in Base.names(df))...))
 nl_eval_string(s::AbstractString) = Base.include_string(NoLimitsSession, s)
 end"""
 
