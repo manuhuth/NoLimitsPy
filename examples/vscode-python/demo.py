@@ -6,8 +6,7 @@
 # ever resolves the Julia environment and can take a few minutes, later runs
 # start in seconds. Plots display inline in the Interactive Window.
 #
-# Requires NoLimits.jl >= 0.2.5 (until released: install the GitHub main
-# revision).
+# Requires NoLimits.jl >= 0.2.5, which juliapkg resolves from the registry.
 
 # %% Setup
 from pathlib import Path
