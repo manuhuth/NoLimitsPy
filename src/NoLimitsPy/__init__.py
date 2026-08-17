@@ -20,6 +20,13 @@ nl_pydf(x::DataFrames.DataFrame) = x  # already converted by the rule below
 nl_names(x) = string.(Base.names(nl_df(x)))
 nl_col(v) = eltype(v) <: Union{Real, AbstractString, Missing, Nothing} ? v : string.(v)
 nl_table(x) = (df = nl_df(x); (; (Symbol(n) => nl_col(df[!, n]) for n in Base.names(df))...))
+# `missing` crosses to Python as an opaque wrapper that pandas does not see as NA;
+# `nothing` crosses as None, which pandas does. Numeric columns already arrive as
+# NaN, so leave those alone and keep their float dtype.
+nl_nona(v) = (eltype(v) >: Missing && !(Base.nonmissingtype(eltype(v)) <: Real)) ?
+    Any[x === missing ? nothing : x for x in v] : v
+nl_pytable_df(x) = (df = nl_df(x);
+    DataFrames.DataFrame([n => nl_nona(df[!, n]) for n in Base.names(df)]))
 nl_eval_string(s::AbstractString) = Base.include_string(NoLimitsSession, s)
 # Any pandas DataFrame passed to a Julia function converts to a DataFrame,
 # so callers never have to convert by hand.
@@ -80,7 +87,10 @@ def model(code):
     `@Model begin ... end`.
     """
     code = code.strip()
-    if "@Model" not in code:
+    # ponytail: a `#` inside a string literal also counts as a comment start here;
+    # good enough to decide whether the source has a real @Model block.
+    uncommented = "\n".join(line.split("#", 1)[0] for line in code.splitlines())
+    if "@Model" not in uncommented:
         code = "@Model begin\n" + code + "\nend"
     return seval(code)
 
@@ -97,7 +107,7 @@ def to_julia(df):
 def collect(x):
     """Julia table (e.g. a predict() result) -> pandas.DataFrame."""
     jl = _julia()
-    return jl.PythonCall.pytable(jl.nl_df(x))
+    return jl.PythonCall.pytable(jl.nl_pytable_df(x))
 
 
 def sym(s):
@@ -105,6 +115,8 @@ def sym(s):
 
     Example: DataModel(model, jdf, primary_id=sym("ID"), time_col=sym("time")).
     """
+    if not isinstance(s, str):
+        raise TypeError(f"sym() needs a str, got {type(s).__name__}")
     return _julia().Symbol(s)
 
 
@@ -116,6 +128,11 @@ def plot(fname, *args, file=None, **kwargs):
     """
     import os
 
+    if "save_path" in kwargs:
+        raise TypeError(
+            "plot() sets save_path itself; pass the destination as file= "
+            "instead of save_path= (not both)."
+        )
     jl = _julia()
     if not _state.get("makie"):
         jl.nl_eval_string("import CairoMakie")
@@ -160,7 +177,11 @@ def status():
         "started": "session" in _state,
         "target_project": os.environ.get("PYTHON_JULIAPKG_PROJECT"),
     }
-    jl = _julia()
+    try:
+        jl = _julia()
+    except Exception as e:  # a boot failure is exactly what status() is for
+        info["error"] = f"{type(e).__name__}: {e}"
+        return info
     info["started"] = True
     info["julia_version"] = str(jl.nl_eval_string("string(VERSION)"))
     info["project"] = str(jl.nl_eval_string("Base.active_project()"))

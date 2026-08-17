@@ -1,4 +1,5 @@
 import math
+import os
 
 import pandas as pd
 import NoLimitsPy as nl
@@ -47,6 +48,59 @@ def test_roundtrip(tmp_path):
     out = tmp_path / "fits.png"
     nl.plot("plot_fits", res, file=str(out))
     assert out.stat().st_size > 0
+
+
+def test_missing_values_round_trip_as_pandas_na():
+    df = pd.DataFrame({"s": ["a", None, float("nan"), "b"]})
+    back = nl.collect(nl.to_julia(df))
+    assert back["s"].isna().tolist() == [False, True, True, False]
+    assert back["s"].tolist()[0] == "a"
+
+
+def test_model_wraps_bare_body_with_at_model_in_a_comment():
+    m = nl.model("""
+# no @Model here, just a comment
+@fixedEffects begin
+    sigma = RealNumber(0.5, scale=:log)
+end
+@covariates begin
+    time = Covariate()
+end
+@formulas begin
+    y ~ Normal(time, sigma)
+end
+""")
+    assert "Model" in str(nl.seval("typeof")(m))
+
+
+def test_sym_rejects_non_strings():
+    import pytest
+    with pytest.raises(TypeError):
+        nl.sym(["ID"])
+
+
+def test_plot_rejects_save_path_alongside_file():
+    import pytest
+    with pytest.raises(TypeError, match="save_path"):
+        nl.plot("plot_fits", None, file="a.png", save_path="b.png")
+
+
+def test_status_reports_a_boot_failure_instead_of_raising(tmp_path):
+    # A file where juliapkg expects a project directory makes the boot fail.
+    import subprocess
+    import sys
+    bad = tmp_path / "not_a_dir"
+    bad.write_text("")
+    code = (
+        "import os, NoLimitsPy as nl;"
+        "info = nl.status();"
+        "print('ERRKEY', 'error' in info)"
+    )
+    env = dict(os.environ, PYTHON_JULIAPKG_PROJECT=str(bad),
+               PYTHON_JULIAPKG_OFFLINE="yes")
+    out = subprocess.run([sys.executable, "-c", code], env=env,
+                         capture_output=True, text=True)
+    assert "ERRKEY True" in out.stdout, out.stdout + out.stderr
 
 
 def test_status_and_use_env_guard():
