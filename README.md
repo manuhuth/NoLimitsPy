@@ -135,9 +135,13 @@ The same mechanism covers Lux, CSV, JLD2, Copulas, and Turing.
 - Getting results back: `nl.collect(x)` turns a Julia table into a pandas DataFrame.
   Scalars convert automatically.
 - `nl.seval(code)` evaluates Julia code, possibly several expressions, in the session
-  module, so anything it defines is visible to later `nl.model` calls. Plain
-  `juliacall.Main.seval` evaluates in `Main` instead and is not visible to model
-  strings.
+  module, so anything it defines is visible to later `nl.model` calls. Evaluating in
+  Julia's `Main` instead, which is what the underlying bridge does by default, is not
+  visible to model strings.
+- Julia console output, for example optimizer traces from `optim_kwargs` with
+  `show_trace` or progress logs, streams to the Python console automatically. In
+  Jupyter or the VS Code Interactive Window, raw Julia output may appear in the
+  terminal running the kernel instead of in the cell.
 - Plotting: `nl.plot("plot_fits", res, file="fits.png")` calls any NoLimits `plot_*`
   function and forwards `save_path`. CairoMakie is loaded on the first plot call only.
 - Model, DataModel, and fit-result objects are live references into the Julia session
