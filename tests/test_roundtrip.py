@@ -38,11 +38,11 @@ def test_roundtrip(tmp_path):
         "y": [10.2, 6.1, 3.6, 1.4, 12.5, 7.8, 4.9, 1.9,
               8.1, 4.9, 3.0, 1.1, 11.0, 6.5, 4.1, 1.6],
     })
-    jdf = nl.to_julia(df)
-    dm = nl.DataModel(model, jdf, primary_id=nl.sym("ID"), time_col=nl.sym("time"))
+    # Raw pandas frame: the pyconvert rule converts it at the call boundary.
+    dm = nl.DataModel(model, df, primary_id=nl.sym("ID"), time_col=nl.sym("time"))
     res = nl.fit_model(dm, nl.Laplace())
     assert math.isfinite(float(nl.get_objective(res)))
-    pred = nl.predict(res, jdf)
+    pred = nl.predict(res, nl.to_julia(df))
     assert "prediction" in list(nl.collect(pred).columns)
     out = tmp_path / "fits.png"
     nl.plot("plot_fits", res, file=str(out))

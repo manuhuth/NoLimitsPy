@@ -16,10 +16,22 @@ import PythonCall
 const DataFrames = NoLimits.DataFrames
 nl_df(tbl) = DataFrames.DataFrame(tbl)
 nl_pydf(x) = DataFrames.DataFrame(PythonCall.PyTable(x))
+nl_pydf(x::DataFrames.DataFrame) = x  # already converted by the rule below
 nl_names(x) = string.(Base.names(nl_df(x)))
 nl_col(v) = eltype(v) <: Union{Real, AbstractString, Missing, Nothing} ? v : string.(v)
 nl_table(x) = (df = nl_df(x); (; (Symbol(n) => nl_col(df[!, n]) for n in Base.names(df))...))
 nl_eval_string(s::AbstractString) = Base.include_string(NoLimitsSession, s)
+# Any pandas DataFrame passed to a Julia function converts to a DataFrame,
+# so callers never have to convert by hand.
+_pyconvert_pandas(::Type{DataFrames.DataFrame}, x) =
+    PythonCall.pyconvert_return(nl_pydf(x))
+for _t in ("pandas.core.frame:DataFrame", "pandas:DataFrame")
+    # ARRAY priority outranks PythonCall's own PyPandasDataFrame rule.
+    PythonCall.pyconvert_add_rule(
+        _t, DataFrames.DataFrame, _pyconvert_pandas,
+        PythonCall.PYCONVERT_PRIORITY_ARRAY,
+    )
+end
 end"""
 
 
@@ -74,7 +86,11 @@ def model(code):
 
 
 def to_julia(df):
-    """pandas.DataFrame (or any table) -> Julia DataFrames.DataFrame."""
+    """pandas.DataFrame (or any table) -> Julia DataFrames.DataFrame.
+
+    Optional: pandas frames convert automatically when passed to any function.
+    Use this to convert once and reuse the result across many calls.
+    """
     return _julia().nl_pydf(df)
 
 

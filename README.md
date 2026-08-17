@@ -81,12 +81,11 @@ df = pd.DataFrame({
           8.1, 4.9, 3.0, 1.1, 11.0, 6.5, 4.1, 1.6],
 })
 
-jdf = nl.to_julia(df)
-dm = nl.DataModel(model, jdf, primary_id=nl.sym("ID"), time_col=nl.sym("time"))
+dm = nl.DataModel(model, df, primary_id=nl.sym("ID"), time_col=nl.sym("time"))
 res = nl.fit_model(dm, nl.Laplace())
 
 print(nl.get_objective(res))
-print(nl.collect(nl.predict(res, jdf)).head())
+print(nl.collect(nl.predict(res, df)).head())
 
 nl.plot("plot_fits", res, file="fits.png")
 ```
@@ -132,6 +131,9 @@ The same mechanism covers Lux, CSV, JLD2, Copulas, and Turing.
   NoLimits.jl documentation for the API, the wrapper adds nothing on top of it.
 - Symbols: use `nl.sym("ID")` for Symbol-typed arguments such as `primary_id` and
   `time_col`. All other keyword arguments pass through as normal Python kwargs.
+- Passing data in: any function accepts a pandas DataFrame directly, it is converted
+  to a Julia DataFrame at the call boundary. `nl.to_julia(df)` converts once up front,
+  which is worth doing when the same frame goes into many calls.
 - Getting results back: `nl.collect(x)` turns a Julia table into a pandas DataFrame.
   Scalars convert automatically.
 - `nl.seval(code)` evaluates Julia code, possibly several expressions, in the session
