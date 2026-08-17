@@ -98,17 +98,20 @@ def plot(fname, *args, file=None, **kwargs):
     Returns the path. Displays inline (IPython) only when `file` is None.
     Loads CairoMakie on first use.
     """
+    import os
+
     jl = _julia()
     if not _state.get("makie"):
         jl.nl_eval_string("import CairoMakie")
         _state["makie"] = True
     show = file is None
     if file is None:
-        import os
         import tempfile
         fd, file = tempfile.mkstemp(suffix=".png")
         os.close(fd)
-    getattr(_state["NoLimits"], fname)(*args, save_path=str(file), **kwargs)
+    # NoLimits requires the save_path directory to exist; a bare filename has an
+    # empty dirname, so hand Julia an absolute path.
+    getattr(_state["NoLimits"], fname)(*args, save_path=os.path.abspath(file), **kwargs)
     if show:
         try:
             from IPython.display import Image, display
