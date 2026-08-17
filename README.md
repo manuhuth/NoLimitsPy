@@ -1,5 +1,7 @@
 # NoLimitsPy
 
+[![CI](https://github.com/manuhuth/NoLimitsPy/actions/workflows/ci.yml/badge.svg)](https://github.com/manuhuth/NoLimitsPy/actions/workflows/ci.yml)
+
 Python interface to [NoLimits.jl](https://github.com/manuhuth/NoLimits.jl), a Julia
 package for nonlinear mixed-effects analysis of longitudinal data.
 
@@ -10,7 +12,7 @@ are available as soon as the Julia package is updated.
 ## Installation
 
 ```bash
-pip install NoLimitsPy
+pip install "git+https://github.com/manuhuth/NoLimitsPy"
 ```
 
 Julia and the NoLimits.jl packages are resolved automatically on first import by
@@ -194,6 +196,26 @@ The same mechanism covers Lux, CSV, JLD2, Copulas, and Turing.
   per field, as in `nl.collect(re.eta)`; `nl.collect(re)` unwraps a single field for you
   and errors, listing the field names, when there are several.
 
+## Examples
+
+- `examples/theophylline.py` is a runnable population-PK script: a
+  one-compartment oral-absorption ODE model on the Theophylline data, fitted with
+  warm-started Laplace, with fit and diagnostic plots written to PNG.
+
+  ```bash
+  python examples/theophylline.py
+  ```
+
+- `examples/vscode-python/` is a ready-to-open VS Code project with the same
+  model as a cell-by-cell script that renders plots inline. See its
+  [README](examples/vscode-python/README.md).
+
+## Related
+
+- [NoLimits.jl](https://github.com/manuhuth/NoLimits.jl), the Julia package this
+  wrapper exposes.
+- [NoLimitsR](https://github.com/manuhuth/NoLimitsR), the sibling R interface.
+
 ## License
 
-MIT
+MIT, see [LICENSE](LICENSE).
