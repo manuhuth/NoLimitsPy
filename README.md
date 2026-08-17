@@ -130,7 +130,7 @@ The same mechanism covers Lux, CSV, JLD2, Copulas, and Turing.
 - Dynamic surface: any NoLimits.jl export is available as `NoLimitsPy.<name>`. See the
   NoLimits.jl documentation for the API, the wrapper adds nothing on top of it.
 - Symbols: use `nl.sym("ID")` for Symbol-typed arguments such as `primary_id` and
-  `time_col`. All other keyword arguments pass through as normal Python kwargs.
+  `time_col`. The name must be a non-empty string. All other keyword arguments pass through as normal Python kwargs.
 - Passing data in: any function accepts a pandas DataFrame directly, it is converted
   to a Julia DataFrame at the call boundary. `nl.to_julia(df)` converts once up front,
   which is worth doing when the same frame goes into many calls.
@@ -143,6 +143,10 @@ The same mechanism covers Lux, CSV, JLD2, Copulas, and Turing.
     `RangeIndex`. Call `df.reset_index()` first when those levels are data.
   - Duplicate column names are renamed. DataFrames.jl requires unique names, so
     `["x", "x"]` becomes `["x", "x_2"]` without a warning. Rename before converting.
+  - An all-NA column comes back NA-detectable but not always in its original dtype: an
+    all-NA `Categorical` reaches Julia as `NaN` (pandas sends the -1 codes as floats),
+    so it returns as `float64` rather than `object`. The dtype no longer depends on the
+    row count.
   - Nullable extension dtypes collapse. `Int64`, `boolean`, and `Categorical` columns
     come back as `object` or `string` columns; values survive, the declared dtype and
     a Categorical's category order do not.
@@ -151,6 +155,9 @@ The same mechanism covers Lux, CSV, JLD2, Copulas, and Turing.
   expect. A dict keyed by anything else stays a Julia dictionary and is passed
   through untouched, which is deliberate: NoLimits options such as `constants_re`
   are keyed by values rather than by names.
+- Model strings: a `@Model` block is recognized when `@Model` opens a line, so a
+  mention of it inside a comment or a string literal does not stop the body from being
+  wrapped in `@Model begin ... end`.
 - `nl.seval(code)` evaluates Julia code, possibly several expressions, in the session
   module, so anything it defines is visible to later `nl.model` calls. Evaluating in
   Julia's `Main` instead, which is what the underlying bridge does by default, is not
