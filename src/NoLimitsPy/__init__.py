@@ -5,7 +5,10 @@ forwarding; only the helpers defined here are hand-written. New NoLimits feature
 appear automatically with package updates - by design, do not add named wrappers.
 """
 
+import threading
+
 _state = {}
+_boot_lock = threading.Lock()
 
 _SESSION_MODULE = """module NoLimitsSession
 using NoLimits
@@ -15,6 +18,13 @@ using NoLimits.LinearAlgebra
 import PythonCall
 const DataFrames = NoLimits.DataFrames
 nl_df(tbl) = DataFrames.DataFrame(tbl)
+# Accessors such as get_random_effects return a NamedTuple of DataFrames, which
+# DataFrame() would read as a one-row table of stringified vectors.
+function nl_df(tbl::NamedTuple{<:Any, <:Tuple{DataFrames.DataFrame, Vararg{DataFrames.DataFrame}}})
+    length(tbl) == 1 && return only(tbl)
+    error("got a NamedTuple of $(length(tbl)) tables (fields: $(join(keys(tbl), ", "))); " *
+          raw"collect one field, e.g. x.eta (Python) / x$eta (R)")
+end
 nl_pydf(x) = DataFrames.DataFrame(PythonCall.PyTable(x))
 nl_pydf(x::DataFrames.DataFrame) = x  # already converted by the rule below
 nl_names(x) = string.(Base.names(nl_df(x)))
@@ -43,12 +53,28 @@ end"""
 
 
 def _julia():
-    """Boot Julia lazily on first use; memoize the session module."""
+    """Boot Julia lazily on first use; memoize the session module.
+
+    Locked: concurrent first calls would otherwise each define the session module,
+    and the redefinition mid-call hangs the process. Julia must also boot on the
+    main thread; booting it from a worker leaves a process that never exits, so
+    that case raises instead of hanging.
+    """
     if "session" not in _state:
-        from juliacall import Main  # first import resolves/installs the Julia env
-        Main.seval(_SESSION_MODULE)
-        _state["session"] = Main.NoLimitsSession
-        _state["NoLimits"] = Main.NoLimitsSession.NoLimits
+        with _boot_lock:
+            if "session" not in _state:
+                if threading.current_thread() is not threading.main_thread():
+                    raise RuntimeError(
+                        "NoLimitsPy must boot Julia on the main thread. Call any "
+                        "NoLimits function once from the main thread (e.g. "
+                        "NoLimitsPy.seval('1+1')) before using NoLimitsPy from "
+                        "worker threads; booting from a worker thread leaves a "
+                        "process that never exits."
+                    )
+                from juliacall import Main  # first import resolves/installs the env
+                Main.seval(_SESSION_MODULE)
+                _state["NoLimits"] = Main.NoLimitsSession.NoLimits
+                _state["session"] = Main.NoLimitsSession
     return _state["session"]
 
 
@@ -86,6 +112,8 @@ def model(code):
     and chain definitions). A bare block body without @Model is wrapped in
     `@Model begin ... end`.
     """
+    if not isinstance(code, str):
+        raise TypeError(f"model() needs a str, got {type(code).__name__}")
     code = code.strip()
     # ponytail: a `#` inside a string literal also counts as a comment start here;
     # good enough to decide whether the source has a real @Model block.
@@ -145,6 +173,9 @@ def plot(fname, *args, file=None, **kwargs):
     # NoLimits requires the save_path directory to exist; a bare filename has an
     # empty dirname, so hand Julia an absolute path.
     getattr(_state["NoLimits"], fname)(*args, save_path=os.path.abspath(file), **kwargs)
+    # Makie leaves ~28 MB of figure memory behind per plot; a collect here recovers
+    # part of it (~19 MB/plot residual, measured) and costs little next to rendering.
+    jl.nl_eval_string("GC.gc(); nothing")
     if show:
         try:
             from IPython.display import Image, display

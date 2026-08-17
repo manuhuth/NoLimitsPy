@@ -45,6 +45,12 @@ def test_roundtrip(tmp_path):
     assert math.isfinite(float(nl.get_objective(res)))
     pred = nl.predict(res, nl.to_julia(df))
     assert "prediction" in list(nl.collect(pred).columns)
+    # get_random_effects returns a NamedTuple of tables; collect() unwraps the
+    # single field instead of stringifying it into one row.
+    re = nl.collect(nl.get_random_effects(res))
+    assert len(re) == 4
+    assert sorted(re["ID"]) == ["s1", "s2", "s3", "s4"]
+    assert re["eta_1"].dtype.kind == "f"
     out = tmp_path / "fits.png"
     nl.plot("plot_fits", res, file=str(out))
     assert out.stat().st_size > 0
@@ -77,6 +83,48 @@ def test_sym_rejects_non_strings():
     import pytest
     with pytest.raises(TypeError):
         nl.sym(["ID"])
+
+
+def test_model_rejects_non_strings():
+    import pytest
+    with pytest.raises(TypeError, match="needs a str"):
+        nl.model(42)
+
+
+def test_threads_after_a_main_thread_warmup_do_not_hang(tmp_path):
+    # The lazy boot used to race when several threads made the first call at once
+    # (double session module -> hung process). Booting from a worker thread hangs
+    # the process at exit, so that path raises instead.
+    import subprocess
+    import sys
+    script = tmp_path / "threads.py"
+    script.write_text(
+        "import threading\n"
+        "import NoLimitsPy as nl\n"
+        "cold = []\n"
+        "def probe():\n"
+        "    try:\n"
+        "        nl.seval('1+1'); cold.append('no error')\n"
+        "    except RuntimeError:\n"
+        "        cold.append('raised')\n"
+        "t = threading.Thread(target=probe); t.start(); t.join()\n"
+        "print('COLD', cold[0])\n"
+        "nl.seval('1+1')\n"
+        "out = []\n"
+        "lk = threading.Lock()\n"
+        "def w(i):\n"
+        "    for j in range(25):\n"
+        "        v = int(nl.seval(f'{i} + {j}'))\n"
+        "        with lk: out.append(v == i + j)\n"
+        "ts = [threading.Thread(target=w, args=(i,)) for i in range(4)]\n"
+        "[t.start() for t in ts]\n"
+        "[t.join() for t in ts]\n"
+        "print('OK', len(out), all(out))\n"
+    )
+    out = subprocess.run([sys.executable, str(script)], env=dict(os.environ),
+                         capture_output=True, text=True, timeout=600)
+    assert "COLD raised" in out.stdout, out.stdout + out.stderr
+    assert "OK 100 True" in out.stdout, out.stdout + out.stderr
 
 
 def test_plot_rejects_save_path_alongside_file():
