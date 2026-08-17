@@ -21,6 +21,31 @@ Later imports are fast.
 `NoLimitsPy.collect` returns a pandas DataFrame, so install `pandas` if you want to
 pull tables back into Python.
 
+## Environments
+
+By default juliapkg puts the Julia environment inside the active virtualenv, so a
+new venv already gives a fresh, isolated set of Julia packages. To place it
+somewhere else, point juliapkg at a project directory before the first NoLimits
+use:
+
+```python
+import NoLimitsPy as nl
+
+nl.use_env("julia-envs/myproject")   # created and resolved on first use
+```
+
+`nl.status()` is the first thing to run when something looks wrong. It reports the
+Julia and NoLimits.jl versions, the active Julia project, and the packages
+installed in it.
+
+`nl.update()` runs `Pkg.update()` on the active environment. If Julia is already
+loaded, the updated versions take effect in the next Python session, because
+loaded Julia code is never replaced in place.
+
+The environment is a boot-time choice for the same reason: Julia cannot unload a
+package. Call `use_env` before the first NoLimits use, and restart the Python
+interpreter to switch afterwards.
+
 ## Quickstart
 
 ```python

@@ -121,6 +121,50 @@ def plot(fname, *args, file=None, **kwargs):
     return file
 
 
+def use_env(path):
+    """Point juliapkg at a custom Julia project directory (creates/resolves it
+    on first use). Must be called before the first NoLimits use; restart Python
+    to switch afterwards. Default without this call: a Julia env inside the
+    active virtualenv, so a new venv already gives a fresh isolated env."""
+    if "session" in _state:
+        raise RuntimeError(
+            "Julia is already running; restart Python and call use_env "
+            "before the first NoLimits use."
+        )
+    import os
+    os.environ["PYTHON_JULIAPKG_PROJECT"] = str(path)
+
+
+def status():
+    """Diagnostic report: versions, active Julia project, installed packages.
+
+    Boots Julia lazily if needed."""
+    import os
+    info = {
+        "started": "session" in _state,
+        "target_project": os.environ.get("PYTHON_JULIAPKG_PROJECT"),
+    }
+    jl = _julia()
+    info["started"] = True
+    info["julia_version"] = str(jl.nl_eval_string("string(VERSION)"))
+    info["project"] = str(jl.nl_eval_string("Base.active_project()"))
+    info["nolimits_version"] = str(jl.nl_eval_string("string(pkgversion(NoLimits))"))
+    info["installed_packages"] = sorted(
+        str(s) for s in jl.nl_eval_string(
+            "import Pkg; collect(keys(Pkg.project().dependencies))"
+        )
+    )
+    return info
+
+
+def update():
+    """Pkg.update() the active Julia environment. If Julia is already loaded,
+    updated versions take effect in the next Python session."""
+    from juliacall import Main
+    Main.seval("import Pkg")
+    Main.Pkg.update()
+
+
 def install_julia_packages(*pkgs):
     """Pkg.add extra Julia packages (e.g. "SimpleChains", "Lux", "CSV", "JLD2")."""
     from juliacall import Main

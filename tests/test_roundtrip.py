@@ -47,3 +47,12 @@ def test_roundtrip(tmp_path):
     out = tmp_path / "fits.png"
     nl.plot("plot_fits", res, file=str(out))
     assert out.stat().st_size > 0
+
+
+def test_status_and_use_env_guard():
+    info = nl.status()
+    assert info["nolimits_version"]
+    assert "NoLimits" in info["installed_packages"]
+    import pytest
+    with pytest.raises(RuntimeError):
+        nl.use_env("/some/other/env")
