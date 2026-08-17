@@ -135,7 +135,22 @@ The same mechanism covers Lux, CSV, JLD2, Copulas, and Turing.
   to a Julia DataFrame at the call boundary. `nl.to_julia(df)` converts once up front,
   which is worth doing when the same frame goes into many calls.
 - Getting results back: `nl.collect(x)` turns a Julia table into a pandas DataFrame.
-  Scalars convert automatically.
+  Scalars convert automatically. Julia `missing` comes back as `None`, which pandas
+  treats as NA, so `isna()` and `dropna()` work on the result.
+- Conversion caveats, all of them consequences of what a Julia `DataFrame` can hold:
+  - A pandas index is dropped. Julia DataFrames have no index concept, so a custom
+    index or a MultiIndex is lost silently and the round trip returns a plain
+    `RangeIndex`. Call `df.reset_index()` first when those levels are data.
+  - Duplicate column names are renamed. DataFrames.jl requires unique names, so
+    `["x", "x"]` becomes `["x", "x_2"]` without a warning. Rename before converting.
+  - Nullable extension dtypes collapse. `Int64`, `boolean`, and `Categorical` columns
+    come back as `object` or `string` columns; values survive, the declared dtype and
+    a Categorical's category order do not.
+- Dict options: a dict whose keys are all strings or symbols becomes a Julia
+  NamedTuple, which is what options such as `optim_kwargs={"show_trace": True}`
+  expect. A dict keyed by anything else stays a Julia dictionary and is passed
+  through untouched, which is deliberate: NoLimits options such as `constants_re`
+  are keyed by values rather than by names.
 - `nl.seval(code)` evaluates Julia code, possibly several expressions, in the session
   module, so anything it defines is visible to later `nl.model` calls. Evaluating in
   Julia's `Main` instead, which is what the underlying bridge does by default, is not
