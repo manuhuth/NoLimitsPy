@@ -159,12 +159,33 @@ The same mechanism covers Lux, CSV, JLD2, Copulas, and Turing.
   `show_trace` or progress logs, streams to the Python console automatically. In
   Jupyter or the VS Code Interactive Window, raw Julia output may appear in the
   terminal running the kernel instead of in the cell.
+- Wide tables are the expensive case for `nl.collect()`: its cost tracks the number of
+  columns, not the number of rows, at roughly 3 ms per column. Measured on one machine,
+  500,000 rows by 5 columns collects in about 0.6 s, while 50 rows by 1000 columns takes
+  about 2.8 s and 50 by 2000 about 5.5 s. Reshape a wide result table (one column per
+  parameter, subject, or simulation draw) to long form in Julia before collecting it.
 - Plotting: `nl.plot("plot_fits", res, file="fits.png")` calls any NoLimits `plot_*`
   function and forwards `save_path`. CairoMakie is loaded on the first plot call only.
-- Model, DataModel, and fit-result objects are live references into the Julia session
-  and do not survive the process. Persist fits with `save_fit`/`load_fit` after
-  `nl.install_julia_packages("JLD2")`. A reloaded fit needs its model string
-  re-evaluated, because models themselves are not serializable.
+- Plot memory: Makie leaves figure memory behind on every plot call, about 28 MB per
+  plot. Because juliacall embeds Julia in the Python process, this shows up as growing
+  RSS. `nl.plot()` runs a Julia garbage collection after saving, which recovers part of
+  it (about 19 MB per plot remained in a measured 10-plot loop), so a long plotting loop
+  still grows; run such loops in a subprocess if memory matters.
+- Threads: the first NoLimits call boots Julia, and Julia must boot on the main thread.
+  Call anything once from the main thread (`nl.seval("1+1")` will do) before using
+  NoLimitsPy from worker threads; a boot triggered from a worker raises rather than
+  leaving a process that never exits.
+- Object lifetime: Model, DataModel, and fit-result objects are live references into the
+  Julia session and do not survive the process. `pickle.dump` on one appears to succeed
+  and even round-trips through `pickle.loads` in the same process, but loading the file
+  in a new process fails with a bare `Exception: error deserializing this value`;
+  `copy.deepcopy` is unreliable for the same reason. Persist fits with
+  `save_fit`/`load_fit` after `nl.install_julia_packages("JLD2")`. A reloaded fit needs
+  its model string re-evaluated, because models themselves are not serializable. For a
+  readable record of an object, save `str(x)`, which is Julia's own printout. Objects
+  such as `get_random_effects(res)` that hold one table per random effect are collected
+  per field, as in `nl.collect(re.eta)`; `nl.collect(re)` unwraps a single field for you
+  and errors, listing the field names, when there are several.
 
 ## License
 
