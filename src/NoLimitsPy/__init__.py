@@ -33,7 +33,10 @@ nl_table(x) = (df = nl_df(x); (; (Symbol(n) => nl_col(df[!, n]) for n in Base.na
 # `missing` crosses to Python as an opaque wrapper that pandas does not see as NA;
 # `nothing` crosses as None, which pandas does. Numeric columns already arrive as
 # NaN, so leave those alone and keep their float dtype.
-nl_nona(v) = (eltype(v) >: Missing && !(Base.nonmissingtype(eltype(v)) <: Real)) ?
+# An all-missing column has eltype `Missing`, whose nonmissingtype is `Union{}` and
+# therefore <: Real, so it needs its own clause or it would be treated as numeric.
+nl_nona(v) = (eltype(v) === Missing ||
+              (eltype(v) >: Missing && !(Base.nonmissingtype(eltype(v)) <: Real))) ?
     Any[x === missing ? nothing : x for x in v] : v
 nl_pytable_df(x) = (df = nl_df(x);
     DataFrames.DataFrame([n => nl_nona(df[!, n]) for n in Base.names(df)]))
@@ -117,8 +120,10 @@ def model(code):
     code = code.strip()
     # ponytail: a `#` inside a string literal also counts as a comment start here;
     # good enough to decide whether the source has a real @Model block.
-    uncommented = "\n".join(line.split("#", 1)[0] for line in code.splitlines())
-    if "@Model" not in uncommented:
+    # A real @Model block opens a line, so a mid-line mention in a string literal
+    # (or a comment) does not count.
+    uncommented = (line.split("#", 1)[0] for line in code.splitlines())
+    if not any(line.lstrip().startswith("@Model") for line in uncommented):
         code = "@Model begin\n" + code + "\nend"
     return seval(code)
 
@@ -145,6 +150,8 @@ def sym(s):
     """
     if not isinstance(s, str):
         raise TypeError(f"sym() needs a str, got {type(s).__name__}")
+    if not s:
+        raise ValueError("sym() needs a non-empty string")
     return _julia().Symbol(s)
 
 

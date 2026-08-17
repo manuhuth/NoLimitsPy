@@ -63,6 +63,38 @@ def test_missing_values_round_trip_as_pandas_na():
     assert back["s"].tolist()[0] == "a"
 
 
+def test_all_missing_and_one_row_columns_come_back_as_na():
+    # An all-missing column has Julia eltype `Missing`, which the first missing->None
+    # fix skipped (nonmissingtype(Missing) is Union{}, a subtype of Real), so raw
+    # Julia `missing` objects leaked into pandas.
+    back = nl.collect(nl.to_julia(pd.DataFrame({"s": [None, None, None]})))
+    assert back["s"].isna().tolist() == [True, True, True]
+    # Same column type whatever the row count, and always NA-detectable. An all-NA
+    # categorical reaches Julia as NaN (pandas sends the -1 codes as floats), so the
+    # dtype is float64 rather than object; what matters is that it no longer depends
+    # on the row count.
+    cols = [nl.collect(nl.to_julia(pd.DataFrame(
+        {"x": list(range(n)),
+         "y": pd.Categorical([None] * n, categories=["a", "b"])})))["y"]
+        for n in (1, 3)]
+    assert cols[0].dtype == cols[1].dtype
+    assert all(c.isna().all() for c in cols)
+
+
+def test_model_rejects_at_model_inside_a_string_literal():
+    import pytest
+    # The heuristic only accepts @Model at the start of a line, so this body gets
+    # wrapped and fails on the missing blocks instead of silently returning 2.
+    with pytest.raises(Exception, match="@Model"):
+        nl.model('msg = "call @Model to build a model"\nx = 1 + 1')
+
+
+def test_sym_rejects_the_empty_string():
+    import pytest
+    with pytest.raises(ValueError):
+        nl.sym("")
+
+
 def test_model_wraps_bare_body_with_at_model_in_a_comment():
     m = nl.model("""
 # no @Model here, just a comment
