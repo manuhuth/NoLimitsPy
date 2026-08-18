@@ -206,10 +206,6 @@ The same mechanism covers Lux, CSV, JLD2, Copulas, and Turing.
   python examples/theophylline.py
   ```
 
-- `examples/vscode-python/` is a ready-to-open VS Code project with the same
-  model as a cell-by-cell script that renders plots inline. See its
-  [README](examples/vscode-python/README.md).
-
 ## Related
 
 - [NoLimits.jl](https://github.com/manuhuth/NoLimits.jl), the Julia package this
