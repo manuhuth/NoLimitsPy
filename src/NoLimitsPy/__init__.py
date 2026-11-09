@@ -159,7 +159,7 @@ def plot(fname, *args, file=None, **kwargs):
     """Call any NoLimits plot_* function by name; save to `file` (or a temp PNG).
 
     Returns the path. Displays inline (IPython) only when `file` is None.
-    Loads CairoMakie on first use.
+    Loads CairoMakie and AlgebraOfGraphics on first use.
     """
     import os
 
@@ -170,7 +170,7 @@ def plot(fname, *args, file=None, **kwargs):
         )
     jl = _julia()
     if not _state.get("makie"):
-        jl.nl_eval_string("import CairoMakie")
+        jl.nl_eval_string("import CairoMakie, AlgebraOfGraphics")
         _state["makie"] = True
     show = file is None
     if file is None:
@@ -180,8 +180,8 @@ def plot(fname, *args, file=None, **kwargs):
     # NoLimits requires the save_path directory to exist; a bare filename has an
     # empty dirname, so hand Julia an absolute path.
     getattr(_state["NoLimits"], fname)(*args, save_path=os.path.abspath(file), **kwargs)
-    # Makie leaves ~28 MB of figure memory behind per plot; a collect here recovers
-    # part of it (~19 MB/plot residual, measured) and costs little next to rendering.
+    # Makie leaves ~30-50 MB of figure memory behind per plot; a collect here cuts it
+    # to ~20 MB/plot (measured) and costs little next to rendering.
     jl.nl_eval_string("GC.gc(); nothing")
     if show:
         try:
