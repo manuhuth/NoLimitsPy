@@ -176,7 +176,8 @@ The same mechanism covers Lux, CSV, JLD2, Copulas, and Turing.
   about 2.8 s and 50 by 2000 about 5.5 s. Reshape a wide result table (one column per
   parameter, subject, or simulation draw) to long form in Julia before collecting it.
 - Plotting: `nl.plot("plot_fits", res, file="fits.png")` calls any NoLimits `plot_*`
-  function and forwards `save_path`. CairoMakie is loaded on the first plot call only.
+  function and forwards `save_path`. CairoMakie and AlgebraOfGraphics are loaded on the
+  first plot call only.
 - Plot memory: Makie leaves figure memory behind on every plot call, about 28 MB per
   plot. Because juliacall embeds Julia in the Python process, this shows up as growing
   RSS. `nl.plot()` runs a Julia garbage collection after saving, which recovers part of

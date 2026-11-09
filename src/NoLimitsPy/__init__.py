@@ -159,7 +159,7 @@ def plot(fname, *args, file=None, **kwargs):
     """Call any NoLimits plot_* function by name; save to `file` (or a temp PNG).
 
     Returns the path. Displays inline (IPython) only when `file` is None.
-    Loads CairoMakie on first use.
+    Loads CairoMakie and AlgebraOfGraphics on first use.
     """
     import os
 
@@ -170,7 +170,7 @@ def plot(fname, *args, file=None, **kwargs):
         )
     jl = _julia()
     if not _state.get("makie"):
-        jl.nl_eval_string("import CairoMakie")
+        jl.nl_eval_string("import CairoMakie, AlgebraOfGraphics")
         _state["makie"] = True
     show = file is None
     if file is None:

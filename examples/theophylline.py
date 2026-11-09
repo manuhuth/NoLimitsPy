@@ -9,7 +9,7 @@
 #  pip install "git+https://github.com/manuhuth/NoLimitsPy"):
 #   python examples/theophylline.py
 #
-# Requires NoLimits.jl >= 0.2.5, which juliapkg resolves from the registry.
+# Requires NoLimits.jl >= 0.3.0, which juliapkg resolves from the registry.
 
 import pandas as pd
 import NoLimitsPy as nl
