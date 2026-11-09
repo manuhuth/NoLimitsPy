@@ -178,11 +178,11 @@ The same mechanism covers Lux, CSV, JLD2, Copulas, and Turing.
 - Plotting: `nl.plot("plot_fits", res, file="fits.png")` calls any NoLimits `plot_*`
   function and forwards `save_path`. CairoMakie and AlgebraOfGraphics are loaded on the
   first plot call only.
-- Plot memory: Makie leaves figure memory behind on every plot call, about 28 MB per
-  plot. Because juliacall embeds Julia in the Python process, this shows up as growing
-  RSS. `nl.plot()` runs a Julia garbage collection after saving, which recovers part of
-  it (about 19 MB per plot remained in a measured 10-plot loop), so a long plotting loop
-  still grows; run such loops in a subprocess if memory matters.
+- Plot memory: Makie leaves figure memory behind on every plot call, about 30 to 50 MB
+  per plot. Because juliacall embeds Julia in the Python process, this shows up as
+  growing RSS. `nl.plot()` runs a Julia garbage collection after saving, which reduces
+  this to about 20 MB per plot in a measured 10-plot loop, so a long plotting loop still
+  grows; run such loops in a subprocess if memory matters.
 - Threads: the first NoLimits call boots Julia, and Julia must boot on the main thread.
   Call anything once from the main thread (`nl.seval("1+1")` will do) before using
   NoLimitsPy from worker threads; a boot triggered from a worker raises rather than
